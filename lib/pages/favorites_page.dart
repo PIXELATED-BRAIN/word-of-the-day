@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:share_plus/share_plus.dart';
 import '../models/daily_word.dart';
 import '../data/words_data.dart';
 
@@ -49,8 +50,8 @@ class _FavoritesPageState extends State<FavoritesPage> {
         backgroundColor: Colors.transparent,
         elevation: 0,
         title: Text(
-          'Favorites',
-          style: GoogleFonts.inter(fontWeight: FontWeight.bold),
+          'ተወዳጆች',
+          style: GoogleFonts.notoSansEthiopic(fontWeight: FontWeight.bold),
         ),
       ),
       body: _isLoading
@@ -63,8 +64,8 @@ class _FavoritesPageState extends State<FavoritesPage> {
                       Icon(Icons.favorite_border, size: 64, color: Colors.grey[800]),
                       const SizedBox(height: 16),
                       Text(
-                        'No favorites yet',
-                        style: GoogleFonts.inter(
+                        'እስካሁን ምንም ተወዳጅ የለም',
+                        style: GoogleFonts.notoSansEthiopic(
                           fontSize: 18,
                           color: Colors.grey[600],
                         ),
@@ -73,54 +74,88 @@ class _FavoritesPageState extends State<FavoritesPage> {
                   ),
                 )
               : ListView.builder(
-                  padding: const EdgeInsets.all(16),
+                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
                   itemCount: favoriteWords.length,
                   itemBuilder: (context, index) {
                     final word = favoriteWords[index];
-                    return Card(
-                      color: Colors.grey[900],
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(16),
+                    return Container(
+                      margin: const EdgeInsets.only(bottom: 16),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.05),
+                        borderRadius: BorderRadius.circular(24),
+                        border: Border.all(
+                          color: Colors.white.withOpacity(0.05),
+                          width: 1,
+                        ),
                       ),
-                      margin: const EdgeInsets.only(bottom: 12),
-                      child: ListTile(
-                        contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 20,
-                          vertical: 8,
-                        ),
-                        title: Text(
-                          word.word,
-                          style: const TextStyle(
-                            fontSize: 24,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.white,
-                            fontFamily: 'Abyssinica SIL',
+                      child: Padding(
+                        padding: const EdgeInsets.all(4),
+                        child: ListTile(
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 8,
                           ),
-                        ),
-                        subtitle: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              word.translation,
-                              style: GoogleFonts.inter(
-                                fontSize: 16,
-                                color: Colors.blueAccent,
-                              ),
+                          leading: Container(
+                            decoration: BoxDecoration(
+                              color: Colors.blueAccent.withOpacity(0.1),
+                              borderRadius: BorderRadius.circular(14),
                             ),
-                            const SizedBox(height: 4),
-                            Text(
-                              word.pronunciation,
-                              style: GoogleFonts.inter(
-                                fontSize: 14,
-                                color: Colors.grey[400],
-                                fontStyle: FontStyle.italic,
-                              ),
+                            child: IconButton(
+                              icon: const Icon(Icons.share_rounded, size: 20, color: Colors.blueAccent),
+                              onPressed: () {
+                                Share.share(
+                                  '🇪🇹 የአማርኛ የቀኑ ቃል 🇪🇹\n\n'
+                                  'ቃል: ${word.word} [${word.pronunciation}]\n'
+                                  'ትርጉም: ${word.translation}\n'
+                                  'ምሳሌ: ${word.example}\n\n'
+                                  '#Amharic #LanguageLearning #Ethiopia'
+                                );
+                              },
                             ),
-                          ],
-                        ),
-                        trailing: IconButton(
-                          icon: const Icon(Icons.favorite, color: Colors.red),
-                          onPressed: () => _removeFavorite(word.word),
+                          ),
+                          title: Text(
+                            word.word,
+                            style: GoogleFonts.notoSansEthiopic(
+                              fontSize: 22,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white,
+                            ),
+                          ),
+                          subtitle: Padding(
+                            padding: const EdgeInsets.only(top: 4),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  word.translation,
+                                  style: GoogleFonts.notoSansEthiopic(
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.w600,
+                                    color: Colors.blueAccent.withOpacity(0.8),
+                                  ),
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  word.pronunciation,
+                                  style: GoogleFonts.inter(
+                                    fontSize: 13,
+                                    color: Colors.grey[500],
+                                    fontStyle: FontStyle.italic,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          trailing: Container(
+                            decoration: BoxDecoration(
+                              color: Colors.redAccent.withOpacity(0.1),
+                              borderRadius: BorderRadius.circular(14),
+                            ),
+                            child: IconButton(
+                              icon: const Icon(Icons.favorite_rounded, size: 20, color: Colors.redAccent),
+                              onPressed: () => _removeFavorite(word.word),
+                            ),
+                          ),
                         ),
                       ),
                     );

@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'dart:ui';
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -39,27 +40,36 @@ class _WordOfTheDayPageState extends State<WordOfTheDayPage> with SingleTickerPr
   bool _isUnlocked = false;
   bool _isAdFree = false;
   DateTime? _firstLaunchTime;
-  String _selectedCategory = 'All';
+  String _selectedCategory = 'ሁሉም';
 
-  String _timeLeft = '';
-  late final Stream<String> _timerStream;
+  late ValueNotifier<String> _timeLeftNotifier;
+  Timer? _timer;
 
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 4, vsync: this);
+    _timeLeftNotifier = ValueNotifier<String>('--:--:--');
     _load();
-    _timerStream = Stream.periodic(const Duration(seconds: 1), (_) => _calculateTimeLeft()).asBroadcastStream();
+    _startTimer();
+  }
+
+  void _startTimer() {
+    _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      _timeLeftNotifier.value = _calculateTimeLeft();
+    });
   }
 
   @override
   void dispose() {
+    _timer?.cancel();
     _tabController.dispose();
+    _timeLeftNotifier.dispose();
     super.dispose();
   }
 
   List<DailyWord> get filteredWords {
-    if (_selectedCategory == 'All') {
+    if (_selectedCategory == 'ሁሉም') {
       return localWords;
     }
     return localWords.where((w) => w.category == _selectedCategory).toList();
@@ -182,20 +192,20 @@ class _WordOfTheDayPageState extends State<WordOfTheDayPage> with SingleTickerPr
 
   String _getLockTitle() {
     if (_displayedDays < _todayDays) {
-      return 'Missed this word?';
+      return 'ይህ ቃል አምልጦዎታል?';
     } else {
-      return 'Unlock Tomorrow\'s Word';
+      return 'የነገውን ቃል ይክፈቱ';
     }
   }
 
   String _getLockSubtitle() {
     if (_isAdFree) {
-      return 'Your ad-free subscription is active!';
+      return 'ፕሪሚየም አገልግሎትዎ ገቢር ነው!';
     }
     if (_displayedDays < _todayDays) {
-      return 'Watch a quick ad to catch up';
+      return 'ለመከታተል አጭር ማስታወቂያ ይመልከቱ';
     } else {
-      return 'Watch an ad to see what\'s next!';
+      return 'የሚቀጥለውን ለማየት ማስታወቂያ ይመልከቱ!';
     }
   }
 
@@ -208,7 +218,7 @@ class _WordOfTheDayPageState extends State<WordOfTheDayPage> with SingleTickerPr
         });
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Ad not ready yet, try again in a moment.')),
+          const SnackBar(content: Text('ማስታወቂያው ገና አልተዘጋጀም፣ እባክዎ ጥቂት ቆይተው እንደገና ይሞክሩ።')),
         );
         _adsService.loadRewarded();
       }
@@ -220,35 +230,36 @@ class _WordOfTheDayPageState extends State<WordOfTheDayPage> with SingleTickerPr
   void _showPaymentSelection(String plan, String price) {
     showModalBottomSheet(
       context: context,
-      backgroundColor: Colors.grey[900],
+      backgroundColor: const Color(0xFF1A1A1A),
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
       ),
       builder: (context) {
         return Padding(
-          padding: const EdgeInsets.all(24),
+          padding: const EdgeInsets.all(32),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
-                'Select Payment Method',
-                style: TextStyle(
-                  fontSize: 20,
+              Text(
+                'የክፍያ ዘዴ ይምረጡ',
+                style: GoogleFonts.notoSansEthiopic(
+                  fontSize: 22,
                   fontWeight: FontWeight.bold,
                   color: Colors.white,
+                  letterSpacing: -0.5,
                 ),
               ),
               const SizedBox(height: 8),
               Text(
-                'For your $plan plan ($price)',
-                style: TextStyle(color: Colors.grey[400]),
+                'ለ$plan ዕቅድዎ ($price)',
+                style: GoogleFonts.notoSansEthiopic(color: Colors.grey[500]),
               ),
-              const SizedBox(height: 24),
-              _paymentOptionTile(plan, 'Telebirr', Icons.phone_android, Colors.blue),
-              _paymentOptionTile(plan, 'CBE Birr', Icons.account_balance, Colors.orange),
-              _paymentOptionTile(plan, 'E-Birr', Icons.wallet, Colors.green),
-              _paymentOptionTile(plan, 'Bank Transfer', Icons.account_balance_wallet, Colors.purple),
+              const SizedBox(height: 32),
+              _paymentOptionTile(plan, 'ቴሌ ብር', Icons.phone_android_rounded, Colors.blue),
+              _paymentOptionTile(plan, 'ሲቢኢ ብር', Icons.account_balance_rounded, Colors.orange),
+              _paymentOptionTile(plan, 'ኢ-ብር', Icons.wallet_rounded, Colors.green),
+              _paymentOptionTile(plan, 'የባንክ ዝውውር', Icons.account_balance_wallet_rounded, Colors.purple),
               const SizedBox(height: 16),
             ],
           ),
@@ -259,9 +270,17 @@ class _WordOfTheDayPageState extends State<WordOfTheDayPage> with SingleTickerPr
 
   Widget _paymentOptionTile(String plan, String name, IconData icon, Color color) {
     return ListTile(
-      leading: Icon(icon, color: color),
-      title: Text(name, style: const TextStyle(color: Colors.white)),
-      trailing: const Icon(Icons.arrow_forward_ios, size: 16, color: Colors.grey),
+      contentPadding: EdgeInsets.zero,
+      leading: Container(
+        padding: const EdgeInsets.all(10),
+        decoration: BoxDecoration(
+          color: color.withOpacity(0.1),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Icon(icon, color: color, size: 24),
+      ),
+      title: Text(name, style: GoogleFonts.notoSansEthiopic(color: Colors.white, fontWeight: FontWeight.w500)),
+      trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 14, color: Colors.grey),
       onTap: () {
         Navigator.pop(context);
         _completePayment(plan);
@@ -291,13 +310,13 @@ class _WordOfTheDayPageState extends State<WordOfTheDayPage> with SingleTickerPr
     if (Platform.isAndroid || Platform.isIOS) {
       Duration duration;
       switch (plan) {
-        case 'WEEKLY':
+        case 'ሳምንታዊ':
           duration = const Duration(days: 7);
           break;
-        case 'MONTHLY':
+        case 'ወርሃዊ':
           duration = const Duration(days: 30);
           break;
-        case 'YEARLY':
+        case 'ዓመታዊ':
           duration = const Duration(days: 365);
           break;
         default:
@@ -309,7 +328,7 @@ class _WordOfTheDayPageState extends State<WordOfTheDayPage> with SingleTickerPr
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Payment Successful! You are now Ad-Free! 🎉'),
+          content: Text('ክፍያው ተሳክቷል! አሁን ከማስታወቂያ ነፃ ነዎት! 🎉'),
           backgroundColor: Colors.green,
         ),
       );
@@ -339,11 +358,11 @@ class _WordOfTheDayPageState extends State<WordOfTheDayPage> with SingleTickerPr
 
   String _getShareText() {
     return '''
-🇪🇹 Amharic Word of the Day 🇪🇹
+🇪🇹 የአማርኛ የቀኑ ቃል 🇪🇹
 
-Word: ${word!.word} [${word!.pronunciation}]
-Translation: ${word!.translation}
-Example: ${word!.example}
+ቃል: ${word!.word} [${word!.pronunciation}]
+ትርጉም: ${word!.translation}
+ምሳሌ: ${word!.example}
 
 #Amharic #LanguageLearning #Ethiopia
 ''';
@@ -386,26 +405,26 @@ Example: ${word!.example}
       ? 'https://play.google.com/store/apps/details?id=com.example.amharicword'
       : 'https://apps.apple.com/app/id123456789';
     
-    Share.share('Check out this Amharic Word of the Day app! 🇪🇹\n\nDownload here: $appUrl');
+    Share.share('ይህንን የአማርኛ የቀኑ ቃል መተግበሪያ ይመልከቱ! 🇪🇹\n\nከዚህ ያውርዱ: $appUrl');
   }
 
   String _getBadgeText() {
     if (_displayedDays == _todayDays) {
-      return '🔥 $streak DAY STREAK';
+      return '🔥 የ$streak ቀናት ተከታታይነት';
     }
     if (_displayedDays > _todayDays) {
-      return '✨ UPCOMING WORD';
+      return '✨ የሚመጣ ቃል';
     }
     if (!_unlockedDays.contains(_displayedDays)) {
-      return '📅 MISSED DAY';
+      return '📅 ያለፈ ቀን';
     }
-    return 'PAST WORD';
+    return 'ያለፈ ቃል';
   }
 
   String _getFormattedDate() {
     if (_firstLaunchTime == null) return '';
     final date = _firstLaunchTime!.add(Duration(days: _displayedDays));
-    return DateFormat('EEEE, MMM d').format(date);
+    return DateFormat('EEEE, MMM d', 'am').format(date); // Note: Requires initialization
   }
 
   @override
@@ -421,8 +440,16 @@ Example: ${word!.example}
         elevation: 0,
         centerTitle: true,
         leading: IconButton(
-          tooltip: 'Favorites',
-          icon: const Icon(Icons.favorite, color: Colors.red),
+          tooltip: 'ተወዳጆች',
+          padding: const EdgeInsets.only(left: 12),
+          icon: Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: Colors.redAccent.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: const Icon(Icons.favorite_rounded, color: Colors.redAccent, size: 20),
+          ),
           onPressed: () async {
             await Navigator.push(
               context,
@@ -432,16 +459,25 @@ Example: ${word!.example}
           },
         ),
         title: Text(
-          _selectedCategory == 'All' ? 'Word of the Day' : _selectedCategory,
-          style: const TextStyle(
-            fontWeight: FontWeight.bold,
-            letterSpacing: 1.2,
+          _selectedCategory == 'ሁሉም' ? 'የቀኑ ቃል' : _selectedCategory,
+          style: GoogleFonts.notoSansEthiopic(
+            fontWeight: FontWeight.w800,
+            fontSize: 20,
+            letterSpacing: -0.5,
           ),
         ),
         actions: [
           IconButton(
-            tooltip: 'Share App',
-            icon: const Icon(Icons.share),
+            tooltip: 'መተግበሪያውን ያጋሩ',
+            padding: const EdgeInsets.only(right: 12),
+            icon: Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.05),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: const Icon(Icons.share_rounded, size: 20),
+            ),
             onPressed: _shareApp,
           ),
         ],
@@ -451,22 +487,43 @@ Example: ${word!.example}
         children: [
           // TAB 1: WORD
           SingleChildScrollView(
-            padding: const EdgeInsets.fromLTRB(24, 16, 24, 32),
+            padding: const EdgeInsets.fromLTRB(24, 24, 24, 32),
             child: Column(
               children: [
                 Text(
-                  _getFormattedDate(),
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
-                    color: Colors.grey[500],
-                    letterSpacing: 1.5,
+                  _getFormattedDate().toUpperCase(),
+                  style: GoogleFonts.notoSansEthiopic(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w900,
+                    color: Colors.grey[600],
+                    letterSpacing: 2,
                   ),
                 ),
                 const SizedBox(height: 32),
-                _buildWordCard(),
-                const SizedBox(height: 48),
-                if (_displayedDays != _todayDays)
+                AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 400),
+                  transitionBuilder: (child, animation) {
+                    return FadeTransition(
+                      opacity: animation,
+                      child: SlideTransition(
+                        position: Tween<Offset>(
+                          begin: const Offset(0.05, 0),
+                          end: Offset.zero,
+                        ).animate(CurvedAnimation(
+                          parent: animation,
+                          curve: Curves.easeOutCubic,
+                        )),
+                        child: child,
+                      ),
+                    );
+                  },
+                  child: KeyedSubtree(
+                    key: ValueKey<int>(_displayedDays),
+                    child: _buildWordCard(),
+                  ),
+                ),
+                if (_displayedDays != _todayDays) ...[
+                  const SizedBox(height: 32),
                   TextButton.icon(
                     onPressed: () {
                       setState(() {
@@ -475,10 +532,25 @@ Example: ${word!.example}
                         _updateUnlockedStatus();
                       });
                     },
-                    icon: const Icon(Icons.today),
-                    label: const Text('BACK TO TODAY'),
-                    style: TextButton.styleFrom(foregroundColor: Colors.blueAccent),
+                    icon: const Icon(Icons.today_rounded, size: 20),
+                    label: Text(
+                      'ወደ ዛሬው ተመለስ',
+                      style: GoogleFonts.notoSansEthiopic(
+                        fontWeight: FontWeight.w800,
+                        fontSize: 12,
+                        letterSpacing: 1,
+                      ),
+                    ),
+                    style: TextButton.styleFrom(
+                      foregroundColor: Colors.blueAccent,
+                      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                        side: BorderSide(color: Colors.blueAccent.withOpacity(0.2)),
+                      ),
+                    ),
                   ),
+                ],
               ],
             ),
           ),
@@ -495,17 +567,17 @@ Example: ${word!.example}
       ),
       bottomNavigationBar: SafeArea(
         child: Container(
-          margin: const EdgeInsets.fromLTRB(24, 0, 24, 20),
+          margin: const EdgeInsets.fromLTRB(24, 8, 24, 20),
           padding: const EdgeInsets.symmetric(vertical: 4),
           decoration: BoxDecoration(
-            color: Colors.grey[900]!.withOpacity(0.9),
-            borderRadius: BorderRadius.circular(20),
+            color: const Color(0xFF141414).withOpacity(0.95),
+            borderRadius: BorderRadius.circular(24),
             border: Border.all(color: Colors.white.withOpacity(0.05)),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.5),
-                blurRadius: 25,
-                offset: const Offset(0, 12),
+                color: Colors.black.withOpacity(0.4),
+                blurRadius: 20,
+                offset: const Offset(0, 8),
               ),
             ],
           ),
@@ -516,45 +588,45 @@ Example: ${word!.example}
             labelPadding: const EdgeInsets.symmetric(horizontal: 16),
             dividerColor: Colors.transparent,
             indicatorSize: TabBarIndicatorSize.label,
-            indicator: UnderlineTabIndicator(
-              borderSide: const BorderSide(color: Colors.blueAccent, width: 3),
-              insets: const EdgeInsets.symmetric(horizontal: 8),
+            indicator: const UnderlineTabIndicator(
+              borderSide: BorderSide(color: Colors.blueAccent, width: 3),
+              insets: EdgeInsets.symmetric(horizontal: 8),
             ),
             labelColor: Colors.blueAccent,
-            unselectedLabelColor: Colors.grey[500],
-            labelStyle: const TextStyle(
-              fontWeight: FontWeight.bold,
+            unselectedLabelColor: Colors.grey[600],
+            labelStyle: GoogleFonts.notoSansEthiopic(
+              fontWeight: FontWeight.w800,
               fontSize: 10,
               letterSpacing: 0.5,
             ),
-            unselectedLabelStyle: const TextStyle(
-              fontWeight: FontWeight.w500,
+            unselectedLabelStyle: GoogleFonts.notoSansEthiopic(
+              fontWeight: FontWeight.w600,
               fontSize: 10,
             ),
             tabs: const [
               Tab(
-                height: 52,
+                height: 54,
                 iconMargin: EdgeInsets.only(bottom: 4),
-                text: 'WORD', 
-                icon: Icon(Icons.menu_book_rounded, size: 22)
+                text: 'ቃል', 
+                icon: Icon(Icons.menu_book_rounded, size: 20)
               ),
               Tab(
-                height: 52,
+                height: 54,
                 iconMargin: EdgeInsets.only(bottom: 4),
-                text: 'TYPE', 
-                icon: Icon(Icons.grid_view_rounded, size: 22)
+                text: 'ዘርፍ', 
+                icon: Icon(Icons.grid_view_rounded, size: 20)
               ),
               Tab(
-                height: 52,
+                height: 54,
                 iconMargin: EdgeInsets.only(bottom: 4),
-                text: 'TIMER', 
-                icon: Icon(Icons.timer_outlined, size: 22)
+                text: 'ሰዓት', 
+                icon: Icon(Icons.timer_outlined, size: 20)
               ),
               Tab(
-                height: 52,
+                height: 54,
                 iconMargin: EdgeInsets.only(bottom: 4),
-                text: 'UPGRADE', 
-                icon: Icon(Icons.stars_rounded, size: 22)
+                text: 'አሻሽል', 
+                icon: Icon(Icons.stars_rounded, size: 20)
               ),
             ],
           ),
@@ -565,199 +637,253 @@ Example: ${word!.example}
 
   Widget _buildWordCard() {
     if (word == null) {
-      return const Center(
+      return Center(
         child: Text(
-          'No words found in this category.',
-          style: TextStyle(color: Colors.grey, fontSize: 18),
+          'በዚህ ዘርፍ ምንም ቃላት አልተገኙም።',
+          style: GoogleFonts.notoSansEthiopic(color: Colors.grey, fontSize: 18),
         ),
       );
     }
-    return SizedBox(
-      width: 340,
-      height: 460, // Increased height
-      child: Card(
-        elevation: 8,
-        shadowColor: Colors.blue.withOpacity(0.2),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(24),
-          side: BorderSide(
-            color: Colors.white.withOpacity(0.1),
-            width: 1,
+    return Container(
+      width: double.infinity,
+      constraints: const BoxConstraints(maxWidth: 340, maxHeight: 500),
+      decoration: BoxDecoration(
+        color: Colors.grey[900],
+        borderRadius: BorderRadius.circular(32),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.blueAccent.withOpacity(0.1),
+            blurRadius: 40,
+            spreadRadius: -10,
+            offset: const Offset(0, 20),
           ),
+        ],
+        border: Border.all(
+          color: Colors.white.withOpacity(0.05),
+          width: 1,
         ),
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            Colors.grey[900]!,
+            Colors.grey[900]!.withOpacity(0.8),
+          ],
+        ),
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(32),
         child: Stack(
           children: [
+            // Decorative background element
+            Positioned(
+              top: -50,
+              right: -50,
+              child: Container(
+                width: 150,
+                height: 150,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: RadialGradient(
+                    colors: [
+                      Colors.blueAccent.withOpacity(0.05),
+                      Colors.transparent,
+                    ],
+                  ),
+                ),
+              ),
+            ),
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
               child: Column(
-                mainAxisSize: MainAxisSize.max,
+                mainAxisSize: MainAxisSize.min,
                 children: [
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      IconButton(
-                        onPressed: _goToPrevious,
-                        icon: const Icon(Icons.arrow_back_ios_new, size: 18),
-                        color: Colors.grey,
-                      ),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 6,
-                        ),
-                        decoration: BoxDecoration(
-                          color: _getBadgeText().contains('MISSED') 
-                              ? Colors.orange.withOpacity(0.1)
-                              : Colors.blue.withOpacity(0.1),
-                          borderRadius: BorderRadius.circular(20),
-                        ),
-                        child: Text(
-                          _getBadgeText(),
-                          style: TextStyle(
-                            fontSize: 10,
-                            fontWeight: FontWeight.w900,
-                            color: _getBadgeText().contains('MISSED') 
-                                ? Colors.orangeAccent
-                                : Colors.blueAccent,
-                            letterSpacing: 1,
+                      _navigationButton(Icons.arrow_back_ios_new, _goToPrevious),
+                      Flexible(
+                        child: Container(
+                          margin: const EdgeInsets.symmetric(horizontal: 8),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 6,
+                          ),
+                          decoration: BoxDecoration(
+                            color: _getBadgeText().contains('ያለፈ') 
+                                ? Colors.orange.withOpacity(0.1)
+                                : Colors.blue.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(
+                              color: _getBadgeText().contains('ያለፈ') 
+                                  ? Colors.orangeAccent.withOpacity(0.2)
+                                  : Colors.blueAccent.withOpacity(0.2),
+                            ),
+                          ),
+                          child: Text(
+                            _getBadgeText(),
+                            style: GoogleFonts.notoSansEthiopic(
+                              fontSize: 9,
+                              fontWeight: FontWeight.w900,
+                              color: _getBadgeText().contains('ያለፈ') 
+                                  ? Colors.orangeAccent
+                                  : Colors.blueAccent,
+                              letterSpacing: 1.2,
+                            ),
+                            overflow: TextOverflow.ellipsis,
                           ),
                         ),
                       ),
-                      IconButton(
-                        onPressed: _goToNext,
-                        icon: const Icon(Icons.arrow_forward_ios, size: 18),
-                        color: Colors.grey,
-                      ),
+                      _navigationButton(Icons.arrow_forward_ios, _goToNext),
                     ],
                   ),
                   const SizedBox(height: 24),
-                  Opacity(
-                    opacity: _isUnlocked ? 1.0 : 0.3,
-                    child: Column(
-                      children: [
-                        FittedBox(
-                          fit: BoxFit.scaleDown,
-                          child: Text(
-                            word!.word,
-                            style: const TextStyle(
-                              fontSize: 42,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.white,
+                  Flexible(
+                    child: SingleChildScrollView(
+                      child: Opacity(
+                        opacity: _isUnlocked ? 1.0 : 0.2,
+                        child: Column(
+                          children: [
+                            Text(
+                              word!.word,
+                              style: GoogleFonts.notoSansEthiopic(
+                                fontSize: 40,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white,
+                                letterSpacing: -0.5,
+                              ),
+                              textAlign: TextAlign.center,
                             ),
-                            textAlign: TextAlign.center,
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          '[ ${word!.pronunciation} ]',
-                          style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                            color: Colors.grey[400],
-                            fontStyle: FontStyle.italic,
-                            fontSize: 14,
-                          ),
-                          textAlign: TextAlign.center,
-                        ),
-                        const SizedBox(height: 20),
-                        Container(
-                          width: 40,
-                          height: 2,
-                          color: Colors.blueAccent.withOpacity(0.5),
-                        ),
-                        const SizedBox(height: 20),
-                        FittedBox(
-                          fit: BoxFit.scaleDown,
-                          child: Text(
-                            word!.translation,
-                            style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                              fontWeight: FontWeight.w500,
-                              fontSize: 22,
+                            const SizedBox(height: 8),
+                            Text(
+                              '[ ${word!.pronunciation} ]',
+                              style: GoogleFonts.inter(
+                                color: Colors.grey[500],
+                                fontStyle: FontStyle.italic,
+                                fontSize: 14,
+                                letterSpacing: 0.5,
+                              ),
+                              textAlign: TextAlign.center,
                             ),
-                            textAlign: TextAlign.center,
-                          ),
+                            const SizedBox(height: 20),
+                            Container(
+                              width: 32,
+                              height: 3,
+                              decoration: BoxDecoration(
+                                color: Colors.blueAccent.withOpacity(0.6),
+                                borderRadius: BorderRadius.circular(2),
+                              ),
+                            ),
+                            const SizedBox(height: 20),
+                            Text(
+                              word!.translation,
+                              style: GoogleFonts.notoSansEthiopic(
+                                fontWeight: FontWeight.w600,
+                                fontSize: 22,
+                                color: Colors.white.withOpacity(0.95),
+                              ),
+                              textAlign: TextAlign.center,
+                            ),
+                            const SizedBox(height: 16),
+                            Padding(
+                              padding: const EdgeInsets.symmetric(horizontal: 8),
+                              child: Text(
+                                '"${word!.example}"',
+                                style: GoogleFonts.notoSansEthiopic(
+                                  fontSize: 15,
+                                  color: Colors.grey[400],
+                                  fontStyle: FontStyle.italic,
+                                  height: 1.5,
+                                ),
+                                textAlign: TextAlign.center,
+                              ),
+                            ),
+                          ],
                         ),
-                        const SizedBox(height: 16),
-                        Text(
-                          '"${word!.example}"',
-                          style: TextStyle(
-                            fontSize: 15,
-                            color: Colors.grey[300],
-                            fontStyle: FontStyle.italic,
-                            height: 1.4,
-                          ),
-                          textAlign: TextAlign.center,
-                        ),
-                      ],
+                      ),
                     ),
                   ),
-                  const SizedBox(height: 24),
-                  const Spacer(), // Pushes icons to the bottom
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      IconButton(
-                        padding: EdgeInsets.zero,
-                        constraints: const BoxConstraints(),
-                        tooltip: 'Favorite',
-                        iconSize: 28,
-                        icon: Icon(
-                          _isFavorite() ? Icons.favorite : Icons.favorite_border,
-                          color: _isFavorite() ? Colors.red : Colors.grey[600],
+                  const SizedBox(height: 16),
+                  FittedBox(
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        IconButton(
+                          padding: EdgeInsets.zero,
+                          constraints: const BoxConstraints(),
+                          tooltip: 'ተወዳጅ',
+                          iconSize: 24,
+                          icon: Icon(
+                            _isFavorite() ? Icons.favorite : Icons.favorite_border,
+                            color: _isFavorite() ? Colors.redAccent : Colors.grey[600],
+                          ),
+                          onPressed: _toggleFavorite,
                         ),
-                        onPressed: _toggleFavorite,
-                      ),
-                      const SizedBox(width: 12),
-                      Container(width: 1, height: 24, color: Colors.white10),
-                      const SizedBox(width: 4),
-                      _socialIconButton('instagram', FontAwesomeIcons.instagram, Colors.purpleAccent),
-                      _socialIconButton('facebook', FontAwesomeIcons.facebook, Colors.blueAccent),
-                      _socialIconButton('telegram', FontAwesomeIcons.telegram, Colors.blue),
-                      _socialIconButton('twitter', FontAwesomeIcons.twitter, Colors.white),
-                    ],
+                        const SizedBox(width: 12),
+                        Container(width: 1, height: 16, color: Colors.white10),
+                        const SizedBox(width: 4),
+                        _socialIconButton('instagram', FontAwesomeIcons.instagram, Colors.purpleAccent),
+                        _socialIconButton('facebook', FontAwesomeIcons.facebook, Colors.blueAccent),
+                        _socialIconButton('telegram', FontAwesomeIcons.telegram, Colors.lightBlue),
+                        _socialIconButton('twitter', FontAwesomeIcons.xTwitter, Colors.white),
+                      ],
+                    ),
                   ),
                 ],
               ),
             ),
             if (!_isUnlocked)
               Positioned.fill(
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: Colors.black.withOpacity(0.85),
-                    borderRadius: BorderRadius.circular(24),
-                  ),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      const Icon(Icons.lock_outline, size: 64, color: Colors.blueAccent),
-                      const SizedBox(height: 16),
-                      Text(
-                        _getLockTitle(),
-                        style: const TextStyle(
-                          fontSize: 20,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        _getLockSubtitle(),
-                        style: TextStyle(color: Colors.grey[400]),
-                      ),
-                      const SizedBox(height: 32),
-                      ElevatedButton.icon(
-                        onPressed: _isAdFree ? _unlockCurrentDay : _showAdToUnlock,
-                        icon: Icon(_isAdFree ? Icons.lock_open : Icons.play_circle_fill, size: 28),
-                        label: Text(_isAdFree ? 'UNLOCK NOW' : 'WATCH AD TO UNLOCK'),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.blueAccent,
-                          foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(30),
+                child: BackdropFilter(
+                  filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
+                  child: Container(
+                    color: Colors.black.withOpacity(0.4),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(20),
+                          decoration: BoxDecoration(
+                            color: Colors.blueAccent.withOpacity(0.1),
+                            shape: BoxShape.circle,
+                            border: Border.all(
+                              color: Colors.blueAccent.withOpacity(0.2),
+                            ),
                           ),
-                          elevation: 4,
+                          child: const Icon(Icons.lock_rounded, size: 48, color: Colors.blueAccent),
                         ),
-                      ),
-                    ],
+                        const SizedBox(height: 24),
+                        Text(
+                          _getLockTitle(),
+                          style: GoogleFonts.notoSansEthiopic(
+                            fontSize: 22,
+                            fontWeight: FontWeight.bold,
+                            letterSpacing: -0.5,
+                          ),
+                        ),
+                        const SizedBox(height: 10),
+                        Text(
+                          _getLockSubtitle(),
+                          style: GoogleFonts.notoSansEthiopic(color: Colors.grey[400], fontSize: 15),
+                        ),
+                        const SizedBox(height: 36),
+                        ElevatedButton.icon(
+                          onPressed: _isAdFree ? _unlockCurrentDay : _showAdToUnlock,
+                          icon: Icon(_isAdFree ? Icons.lock_open_rounded : Icons.play_circle_fill_rounded, size: 24),
+                          label: Text(_isAdFree ? 'አሁኑኑ ይክፈቱ' : 'ለማየት ማስታወቂያ ይመልከቱ'),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.blueAccent,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 18),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                            elevation: 8,
+                            shadowColor: Colors.blueAccent.withOpacity(0.4),
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ),
@@ -767,48 +893,90 @@ Example: ${word!.example}
     );
   }
 
+  Widget _navigationButton(IconData icon, VoidCallback onPressed) {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.05),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: IconButton(
+        onPressed: onPressed,
+        icon: Icon(icon, size: 16),
+        color: Colors.grey[400],
+        padding: const EdgeInsets.all(10),
+        constraints: const BoxConstraints(),
+      ),
+    );
+  }
+
   Widget _buildTimerTab() {
     return Center(
       child: SingleChildScrollView(
-        child: StreamBuilder<String>(
-          stream: _timerStream,
-          builder: (context, snapshot) {
+        padding: const EdgeInsets.symmetric(horizontal: 40),
+        child: ValueListenableBuilder<String>(
+          valueListenable: _timeLeftNotifier,
+          builder: (context, time, _) {
             return Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                const SizedBox(height: 32),
-                const Icon(Icons.hourglass_empty_rounded, size: 80, color: Colors.blueAccent),
-                const SizedBox(height: 32),
+                Container(
+                  padding: const EdgeInsets.all(32),
+                  decoration: BoxDecoration(
+                    color: Colors.blueAccent.withOpacity(0.05),
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: Colors.blueAccent.withOpacity(0.1),
+                      width: 2,
+                    ),
+                  ),
+                  child: const Icon(Icons.timer_outlined, size: 80, color: Colors.blueAccent),
+                ),
+                const SizedBox(height: 48),
                 Text(
-                  'NEXT WORD IN',
-                  style: TextStyle(
-                    fontSize: 16,
+                  'የሚቀጥለው ቃል በ',
+                  style: GoogleFonts.notoSansEthiopic(
+                    fontSize: 14,
                     fontWeight: FontWeight.w900,
-                    color: Colors.grey[600],
-                    letterSpacing: 4,
+                    color: Colors.grey[500],
+                    letterSpacing: 6,
                   ),
                 ),
-                const SizedBox(height: 24),
+                const SizedBox(height: 32),
                 Container(
+                  width: double.infinity,
+                  constraints: const BoxConstraints(maxWidth: 320),
                   padding: const EdgeInsets.symmetric(
-                    horizontal: 40,
+                    horizontal: 24,
                     vertical: 24,
                   ),
                   decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.05),
+                    color: Colors.white.withOpacity(0.03),
                     borderRadius: BorderRadius.circular(32),
                     border: Border.all(
-                      color: Colors.white.withOpacity(0.1),
+                      color: Colors.white.withOpacity(0.05),
                     ),
                   ),
-                  child: Text(
-                    snapshot.data ?? '--:--:--',
-                    style: const TextStyle(
-                      fontSize: 48,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white,
-                      letterSpacing: 8,
+                  child: FittedBox(
+                    fit: BoxFit.scaleDown,
+                    child: Text(
+                      time,
+                      style: GoogleFonts.jetBrainsMono(
+                        fontSize: 52,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                        letterSpacing: 1,
+                      ),
                     ),
+                  ),
+                ),
+                const SizedBox(height: 40),
+                Text(
+                  'የቀኑ ቃል መተግበሪያውን ለመጀመሪያ ጊዜ ከከፈቱበት ሰዓት ጀምሮ በየ24 ሰዓቱ ይታደሳል።',
+                  textAlign: TextAlign.center,
+                  style: GoogleFonts.notoSansEthiopic(
+                    color: Colors.grey[600],
+                    fontSize: 13,
+                    height: 1.5,
                   ),
                 ),
                 const SizedBox(height: 32),
@@ -823,68 +991,102 @@ Example: ${word!.example}
   Widget _buildStoreTab() {
     return Center(
       child: SingleChildScrollView(
-        padding: const EdgeInsets.all(32),
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
         child: Container(
-          constraints: const BoxConstraints(maxWidth: 400),
-          padding: const EdgeInsets.all(32),
+          width: double.infinity,
+          constraints: const BoxConstraints(maxWidth: 340),
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
           decoration: BoxDecoration(
             gradient: LinearGradient(
-              colors: [Colors.blueAccent.withOpacity(0.15), Colors.purpleAccent.withOpacity(0.1)],
+              colors: [
+                const Color(0xFF1A1A1A),
+                Colors.blueAccent.withOpacity(0.05),
+              ],
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
             ),
             borderRadius: BorderRadius.circular(32),
             border: Border.all(
-              color: Colors.blueAccent.withOpacity(0.3),
-              width: 1,
+              color: Colors.blueAccent.withOpacity(0.1),
+              width: 1.5,
             ),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.3),
+                blurRadius: 30,
+                offset: const Offset(0, 15),
+              ),
+            ],
           ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Icon(Icons.stars_rounded, color: Colors.amber, size: 64),
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.amber.withOpacity(0.1),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(Icons.stars_rounded, color: Colors.amber, size: 48),
+              ),
               const SizedBox(height: 24),
               Text(
-                _isAdFree ? 'PREMIUM ACTIVE' : 'REMOVE ALL ADS',
-                style: const TextStyle(
-                  fontSize: 24,
+                _isAdFree ? 'ፕሪሚየም ገቢር ሆኗል' : 'ማስታወቂያዎችን ያስወግዱ',
+                textAlign: TextAlign.center,
+                style: GoogleFonts.notoSansEthiopic(
+                  fontSize: 22,
                   fontWeight: FontWeight.w900,
-                  color: Colors.amber,
-                  letterSpacing: 2,
+                  color: Colors.white,
+                  letterSpacing: 1.5,
                 ),
               ),
               const SizedBox(height: 12),
               Text(
-                'Support the app and unlock everything instantly!',
+                'መተግበሪያውን ይደግፉ እና ሁሉንም ባህሪያት፣ ያለፉ እና የሚመጡ ቃላትን ወዲያውኑ ያግኙ!',
                 textAlign: TextAlign.center,
-                style: TextStyle(color: Colors.grey[400], fontSize: 14),
+                style: GoogleFonts.notoSansEthiopic(
+                  color: Colors.grey[500],
+                  fontSize: 13,
+                  height: 1.5,
+                ),
               ),
-              const SizedBox(height: 40),
+              const SizedBox(height: 32),
               if (_isAdFree)
                 Column(
                   children: [
-                    const Icon(Icons.check_circle, color: Colors.green, size: 48),
-                    const SizedBox(height: 16),
-                    const Text(
-                      'Thank you for your support! 💎',
-                      style: TextStyle(color: Colors.white, fontSize: 18),
+                    Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: Colors.green.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: const Icon(Icons.check_circle_rounded, color: Colors.green, size: 40),
                     ),
-                    const SizedBox(height: 12),
+                    const SizedBox(height: 16),
                     Text(
-                      'We will notify you when your subscription ends.',
+                      'ለድጋፍዎ እናመሰግናለን! 💎',
+                      style: GoogleFonts.notoSansEthiopic(
+                        color: Colors.white,
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'ሁሉንም ነገር የመጠቀም መብት አሎት።',
                       textAlign: TextAlign.center,
-                      style: TextStyle(color: Colors.grey[500], fontSize: 12),
+                      style: GoogleFonts.notoSansEthiopic(color: Colors.grey[600], fontSize: 12),
                     ),
                   ],
                 )
               else
                 Column(
                   children: [
-                    _dealItem('WEEKLY', '100 ETB'),
-                    const SizedBox(height: 16),
-                    _dealItem('MONTHLY', '400 ETB'),
-                    const SizedBox(height: 16),
-                    _dealItem('YEARLY', '800 ETB'),
+                    _dealItem('ሳምንታዊ', '100 ብር', Colors.blueAccent),
+                    const SizedBox(height: 12),
+                    _dealItem('ወርሃዊ', '400 ብር', Colors.purpleAccent),
+                    const SizedBox(height: 12),
+                    _dealItem('ዓመታዊ', '800 ብር', Colors.amber),
                   ],
                 ),
             ],
@@ -894,37 +1096,54 @@ Example: ${word!.example}
     );
   }
 
-  Widget _dealItem(String title, String price) {
+  Widget _dealItem(String title, String price, Color color) {
     return InkWell(
       onTap: () => _showPaymentSelection(title, price),
-      borderRadius: BorderRadius.circular(12),
+      borderRadius: BorderRadius.circular(24),
       child: Container(
         width: double.infinity,
-        padding: const EdgeInsets.symmetric(vertical: 16),
+        padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 20),
         decoration: BoxDecoration(
-          color: Colors.white.withOpacity(0.05),
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: Colors.white.withOpacity(0.1)),
+          color: Colors.white.withOpacity(0.03),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: Colors.white.withOpacity(0.05),
+            width: 1,
+          ),
         ),
-        child: Column(
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Text(
-              title,
-              style: const TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w900,
-                color: Colors.grey,
-                letterSpacing: 2,
-              ),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: GoogleFonts.notoSansEthiopic(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w900,
+                    color: color,
+                    letterSpacing: 1.5,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  price,
+                  style: GoogleFonts.notoSansEthiopic(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                  ),
+                ),
+              ],
             ),
-            const SizedBox(height: 4),
-            Text(
-              price,
-              style: const TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-                color: Colors.white,
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: color.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(12),
               ),
+              child: Icon(Icons.arrow_forward_ios_rounded, size: 12, color: color),
             ),
           ],
         ),
@@ -942,7 +1161,7 @@ Example: ${word!.example}
       child: IconButton(
         icon: FaIcon(icon, color: _isUnlocked ? color : Colors.grey[800], size: 20),
         onPressed: _isUnlocked ? () => _shareVia(platform) : null,
-        tooltip: 'Share on ${platform[0].toUpperCase()}${platform.substring(1)}',
+        tooltip: 'በ${platform[0].toUpperCase()}${platform.substring(1)} ያጋሩ',
       ),
     );
   }
