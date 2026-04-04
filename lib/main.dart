@@ -8,13 +8,12 @@ import 'dart:io';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Initialize date formatting for Amharic
-  await initializeDateFormatting('am', null);
-
-  // Ads only on mobile platforms
+  // Ads and notifications only on mobile platforms
   if (Platform.isAndroid || Platform.isIOS) {
-    await MobileAds.instance.initialize();
-    await NotificationService().init();
+    try {
+      await MobileAds.instance.initialize();
+      await NotificationService().init();
+    } catch (_) {}
   }
 
   runApp(const MyApp());

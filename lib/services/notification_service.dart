@@ -81,29 +81,4 @@ class NotificationService {
 
     await _plugin.show(id, title, body, details);
   }
-
-  Future<void> scheduleSubscriptionEndNotification(Duration duration) async {
-    const details = NotificationDetails(
-      android: AndroidNotificationDetails(
-        'subscription_channel',
-        'Subscription Alerts',
-        channelDescription: 'Notifications about your subscription status',
-        importance: Importance.max,
-        priority: Priority.high,
-      ),
-    );
-
-    final scheduledDate = tz.TZDateTime.now(tz.local).add(duration);
-
-    await _plugin.zonedSchedule(
-      1,
-      'Subscription Ending Soon',
-      'Your ad-free subscription is about to end. Renew now to stay premium!',
-      scheduledDate,
-      details,
-      androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
-      uiLocalNotificationDateInterpretation:
-          UILocalNotificationDateInterpretation.absoluteTime,
-    );
-  }
 }

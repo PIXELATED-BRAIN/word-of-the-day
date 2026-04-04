@@ -48,7 +48,7 @@ class _WordOfTheDayPageState extends State<WordOfTheDayPage> with SingleTickerPr
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 4, vsync: this);
+    _tabController = TabController(length: 3, vsync: this);
     _timeLeftNotifier = ValueNotifier<String>('--:--:--');
     _load();
     _startTimer();
@@ -150,7 +150,7 @@ class _WordOfTheDayPageState extends State<WordOfTheDayPage> with SingleTickerPr
   Future<void> _loadFavorites() async {
     final prefs = await SharedPreferences.getInstance();
     _favoriteWords = prefs.getStringList('favorite_words') ?? [];
-    _isAdFree = prefs.getBool('is_ad_free') ?? false;
+    _isAdFree = true;
   }
 
   Future<void> _loadUnlockedDays() async {
@@ -224,114 +224,6 @@ class _WordOfTheDayPageState extends State<WordOfTheDayPage> with SingleTickerPr
       }
     } else {
       _unlockCurrentDay();
-    }
-  }
-
-  void _showPaymentSelection(String plan, String price) {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: const Color(0xFF1A1A1A),
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
-      ),
-      builder: (context) {
-        return Padding(
-          padding: const EdgeInsets.all(32),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'የክፍያ ዘዴ ይምረጡ',
-                style: GoogleFonts.notoSansEthiopic(
-                  fontSize: 22,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.white,
-                  letterSpacing: -0.5,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                'ለ$plan ዕቅድዎ ($price)',
-                style: GoogleFonts.notoSansEthiopic(color: Colors.grey[500]),
-              ),
-              const SizedBox(height: 32),
-              _paymentOptionTile(plan, 'ቴሌ ብር', Icons.phone_android_rounded, Colors.blue),
-              _paymentOptionTile(plan, 'ሲቢኢ ብር', Icons.account_balance_rounded, Colors.orange),
-              _paymentOptionTile(plan, 'ኢ-ብር', Icons.wallet_rounded, Colors.green),
-              _paymentOptionTile(plan, 'የባንክ ዝውውር', Icons.account_balance_wallet_rounded, Colors.purple),
-              const SizedBox(height: 16),
-            ],
-          ),
-        );
-      },
-    );
-  }
-
-  Widget _paymentOptionTile(String plan, String name, IconData icon, Color color) {
-    return ListTile(
-      contentPadding: EdgeInsets.zero,
-      leading: Container(
-        padding: const EdgeInsets.all(10),
-        decoration: BoxDecoration(
-          color: color.withOpacity(0.1),
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: Icon(icon, color: color, size: 24),
-      ),
-      title: Text(name, style: GoogleFonts.notoSansEthiopic(color: Colors.white, fontWeight: FontWeight.w500)),
-      trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 14, color: Colors.grey),
-      onTap: () {
-        Navigator.pop(context);
-        _completePayment(plan);
-      },
-    );
-  }
-
-  Future<void> _completePayment(String plan) async {
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => const Center(child: CircularProgressIndicator()),
-    );
-
-    await Future.delayed(const Duration(seconds: 2));
-    Navigator.pop(context);
-
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool('is_ad_free', true);
-
-    setState(() {
-      _isAdFree = true;
-      _updateUnlockedStatus();
-    });
-
-    // Schedule notification based on plan
-    if (Platform.isAndroid || Platform.isIOS) {
-      Duration duration;
-      switch (plan) {
-        case 'ሳምንታዊ':
-          duration = const Duration(days: 7);
-          break;
-        case 'ወርሃዊ':
-          duration = const Duration(days: 30);
-          break;
-        case 'ዓመታዊ':
-          duration = const Duration(days: 365);
-          break;
-        default:
-          duration = const Duration(days: 30);
-      }
-      await _notificationService.scheduleSubscriptionEndNotification(duration);
-    }
-
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('ክፍያው ተሳክቷል! አሁን ከማስታወቂያ ነፃ ነዎት! 🎉'),
-          backgroundColor: Colors.green,
-        ),
-      );
     }
   }
 
@@ -424,7 +316,7 @@ class _WordOfTheDayPageState extends State<WordOfTheDayPage> with SingleTickerPr
   String _getFormattedDate() {
     if (_firstLaunchTime == null) return '';
     final date = _firstLaunchTime!.add(Duration(days: _displayedDays));
-    return DateFormat('EEEE, MMM d', 'am').format(date); // Note: Requires initialization
+    return DateFormat('EEEE, MMM d', 'en_US').format(date);
   }
 
   @override
@@ -560,9 +452,6 @@ class _WordOfTheDayPageState extends State<WordOfTheDayPage> with SingleTickerPr
           
           // TAB 3: TIMER
           _buildTimerTab(),
-          
-          // TAB 4: UPGRADE
-          _buildStoreTab(),
         ],
       ),
       bottomNavigationBar: SafeArea(
@@ -596,37 +485,31 @@ class _WordOfTheDayPageState extends State<WordOfTheDayPage> with SingleTickerPr
             unselectedLabelColor: Colors.grey[600],
             labelStyle: GoogleFonts.notoSansEthiopic(
               fontWeight: FontWeight.w800,
-              fontSize: 10,
+              fontSize: 13,
               letterSpacing: 0.5,
             ),
             unselectedLabelStyle: GoogleFonts.notoSansEthiopic(
               fontWeight: FontWeight.w600,
-              fontSize: 10,
+              fontSize: 13,
             ),
             tabs: const [
               Tab(
-                height: 54,
-                iconMargin: EdgeInsets.only(bottom: 4),
+                height: 60,
+                iconMargin: EdgeInsets.only(bottom: 2),
                 text: 'ቃል', 
                 icon: Icon(Icons.menu_book_rounded, size: 20)
               ),
               Tab(
-                height: 54,
-                iconMargin: EdgeInsets.only(bottom: 4),
+                height: 60,
+                iconMargin: EdgeInsets.only(bottom: 2),
                 text: 'ዘርፍ', 
                 icon: Icon(Icons.grid_view_rounded, size: 20)
               ),
               Tab(
-                height: 54,
-                iconMargin: EdgeInsets.only(bottom: 4),
+                height: 60,
+                iconMargin: EdgeInsets.only(bottom: 2),
                 text: 'ሰዓት', 
                 icon: Icon(Icons.timer_outlined, size: 20)
-              ),
-              Tab(
-                height: 54,
-                iconMargin: EdgeInsets.only(bottom: 4),
-                text: 'አሻሽል', 
-                icon: Icon(Icons.stars_rounded, size: 20)
               ),
             ],
           ),
@@ -983,169 +866,6 @@ class _WordOfTheDayPageState extends State<WordOfTheDayPage> with SingleTickerPr
               ],
             );
           },
-        ),
-      ),
-    );
-  }
-
-  Widget _buildStoreTab() {
-    return Center(
-      child: SingleChildScrollView(
-        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
-        child: Container(
-          width: double.infinity,
-          constraints: const BoxConstraints(maxWidth: 340),
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              colors: [
-                const Color(0xFF1A1A1A),
-                Colors.blueAccent.withOpacity(0.05),
-              ],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-            ),
-            borderRadius: BorderRadius.circular(32),
-            border: Border.all(
-              color: Colors.blueAccent.withOpacity(0.1),
-              width: 1.5,
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.3),
-                blurRadius: 30,
-                offset: const Offset(0, 15),
-              ),
-            ],
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: Colors.amber.withOpacity(0.1),
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(Icons.stars_rounded, color: Colors.amber, size: 48),
-              ),
-              const SizedBox(height: 24),
-              Text(
-                _isAdFree ? 'ፕሪሚየም ገቢር ሆኗል' : 'ማስታወቂያዎችን ያስወግዱ',
-                textAlign: TextAlign.center,
-                style: GoogleFonts.notoSansEthiopic(
-                  fontSize: 22,
-                  fontWeight: FontWeight.w900,
-                  color: Colors.white,
-                  letterSpacing: 1.5,
-                ),
-              ),
-              const SizedBox(height: 12),
-              Text(
-                'መተግበሪያውን ይደግፉ እና ሁሉንም ባህሪያት፣ ያለፉ እና የሚመጡ ቃላትን ወዲያውኑ ያግኙ!',
-                textAlign: TextAlign.center,
-                style: GoogleFonts.notoSansEthiopic(
-                  color: Colors.grey[500],
-                  fontSize: 13,
-                  height: 1.5,
-                ),
-              ),
-              const SizedBox(height: 32),
-              if (_isAdFree)
-                Column(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: Colors.green.withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      child: const Icon(Icons.check_circle_rounded, color: Colors.green, size: 40),
-                    ),
-                    const SizedBox(height: 16),
-                    Text(
-                      'ለድጋፍዎ እናመሰግናለን! 💎',
-                      style: GoogleFonts.notoSansEthiopic(
-                        color: Colors.white,
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      'ሁሉንም ነገር የመጠቀም መብት አሎት።',
-                      textAlign: TextAlign.center,
-                      style: GoogleFonts.notoSansEthiopic(color: Colors.grey[600], fontSize: 12),
-                    ),
-                  ],
-                )
-              else
-                Column(
-                  children: [
-                    _dealItem('ሳምንታዊ', '100 ብር', Colors.blueAccent),
-                    const SizedBox(height: 12),
-                    _dealItem('ወርሃዊ', '400 ብር', Colors.purpleAccent),
-                    const SizedBox(height: 12),
-                    _dealItem('ዓመታዊ', '800 ብር', Colors.amber),
-                  ],
-                ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _dealItem(String title, String price, Color color) {
-    return InkWell(
-      onTap: () => _showPaymentSelection(title, price),
-      borderRadius: BorderRadius.circular(24),
-      child: Container(
-        width: double.infinity,
-        padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 20),
-        decoration: BoxDecoration(
-          color: Colors.white.withOpacity(0.03),
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(
-            color: Colors.white.withOpacity(0.05),
-            width: 1,
-          ),
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: GoogleFonts.notoSansEthiopic(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w900,
-                    color: color,
-                    letterSpacing: 1.5,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  price,
-                  style: GoogleFonts.notoSansEthiopic(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
-                  ),
-                ),
-              ],
-            ),
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: color.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Icon(Icons.arrow_forward_ios_rounded, size: 12, color: color),
-            ),
-          ],
         ),
       ),
     );
